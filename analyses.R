@@ -2,7 +2,8 @@ library(tidyverse)
 library(lmerTest)
 library(brms)
 library(corrplot)
-setwd("/Users/bensilver/Google Drive/My Drive/Grad School/Projects/Self_Memory/")
+library(ggpubr)
+setwd("/Users/benjaminsilver/Google Drive/My Drive/Grad School/Projects/Self_Memory/")
 
 # load raw data
 pre <- read_csv("data/pre_new.csv")
@@ -122,6 +123,25 @@ summary(lmer(difference ~ pre_comp*positive +
                filter(comparison == "post1_pre_nonabs" | 
                         comparison == "post2_post1_nonabs")))
 
+# test for time effects
+traits_model_time <- traits_model %>% 
+  mutate(timelag = recode(comparison,
+                          "post1_pre" = 3,
+                          "post2_pre" = 5,
+                          "post3_pre" = 11,
+                          "post2_post1" = 2,
+                          "post3_post1" = 8,
+                          "post3_post2" = 6)) %>% 
+  filter(comparison == "post1_pre" |
+           comparison == "post2_post1" |
+           comparison == "post3_post3")
+
+summary(lmer(difference ~ timelag + 
+               (1 | prolificid),
+             data = traits_model_time))
+
+
+
 #### figures #######
 
 traits_model$comparison <- factor(traits_model$comparison,
@@ -135,30 +155,63 @@ traits_model$comparison <- factor(traits_model$comparison,
 traits_figure <- traits_model %>% 
   group_by(prolificid,comparison,pre_comp,pospectrum) %>% 
   summarize(difference = mean(difference)) %>% 
-  mutate(comparison = recode(comparison,
-                             "post1_pre" = "T1-T0","post2_pre" = "T2-T0",
-                             "post3_pre" = "T3-T0","post2_post1" = "T2-T1",
-                             "post3_post1" = "T3-T1","post3_post2" = "T3-T2"),
+  mutate(comparison.d = recode(comparison,
+                               "post1_pre" = 1,
+                               "post2_pre" = 2,
+                               "post3_pre" = 3,
+                               "post2_post1" = 5,
+                               "post3_post1" = 6,
+                               "post3_post2" = 7),
          pre_comp = factor(pre_comp,levels = c(1,0)))
 
-ggplot(traits_figure, 
-       aes(x = comparison,y = difference,
-           color = pre_comp)) +
-  geom_jitter(alpha = .1, size = 2) +
+f2a <- ggplot(traits_figure %>% 
+                group_by(prolificid,pre_comp) %>% 
+                summarize(difference = mean(difference,na.rm = T)), 
+              aes(x = pre_comp,y = difference,
+                  color = pre_comp, fill = pre_comp)) +
+  geom_violin(alpha = .3) +
+  stat_summary(fun = mean, fun.min = mean, fun.max = mean, 
+               width = .6, geom = "crossbar") +
+  theme_classic() +
+  labs(y = "Self-View Change\n(Absolute Difference)",
+       title = "Changes in self-views of traits", color = "Timepoint\nComparison",
+       fill = "Timepoint\nComparison") +
+  scale_color_manual(values = c("steelblue","olivedrab")) +
+  scale_fill_manual(values = c("steelblue","olivedrab")) +
+  scale_x_discrete(labels = c("Across election","After election")) +
+  geom_segment(x = 1, xend = 2, y = 1.1, yend = 1.1, 
+               size = .75, color = "black",linetype = 'dashed') +
+  annotate("text",label = "*",x = 1.5, y = 1.15, size = 10) +
+  theme(axis.title = element_text(size = 14),
+        axis.title.x = element_blank(),
+        legend.position = "none",
+        axis.text.y = element_text(size = 12),
+        axis.text.x = element_text(size = 14),
+        plot.title = element_text(size = 18, hjust = .5))
+
+f2b <- ggplot(traits_figure, 
+       aes(x = comparison.d,y = difference, group = comparison,
+           color = pre_comp, fill = pre_comp)) +
+  geom_violin(alpha = .3) +
   stat_summary(fun = mean, fun.min = mean, fun.max = mean, 
                width = .9, geom = "crossbar") +
   theme_classic() +
-  labs(x = "Comparison Type", y = "Self-View Change\n(Absolute Difference)",
-       title = "Changes in self-views of traits", color = "Timepoint\nComparison") +
-  scale_color_manual(values = c("steelblue","olivedrab"),
-                     labels = c("Across election","After election")) +
+  labs(x = "Across election                   After election     ", 
+       y = "Self-View Change\n(Absolute Difference)",
+       title = "Changes in self-views of traits", color = "Timepoint\nComparison",
+       fill = "Timepoint\nComparison") +
+  scale_color_manual(values = c("steelblue","olivedrab")) +
+  scale_fill_manual(values = c("steelblue","olivedrab")) +
+  scale_x_continuous(breaks = c(1,2,3,5,6,7),
+                     labels = c("1wk-post–\n2wks-pre","3wks-post–\n2wks-pre",
+                                "9wks-post–\n2wks-pre","3wks-post–\n1wk-post",
+                                "9wks-post–\n1wk-post","9wks-post–\n3wks-post")) +
   theme(axis.title = element_text(size = 14),
-        legend.text = element_text(size = 12),
-        legend.title = element_text(size = 14),
-        axis.title.x = element_blank(),
+        legend.position = "none",
+        axis.text.x = element_text(size = 11,angle = 70, vjust = .5,hjust = .5),
         axis.text = element_text(size = 12),
         plot.title = element_text(size = 18, hjust = .5))
-ggsave("figs/paper/traits_q1.jpg", scale = .7)
+
 ##### Q1 - Values ######
 #### Clean/prep #####
 pre_values <- pre %>% 
@@ -243,6 +296,23 @@ summary(lmer(difference ~ pre_comp*pospectrum +
                filter(comparison == "post1_pre" | 
                         comparison == "post2_post1")))
 
+# test for time effects
+values_model_time <- values_model %>% 
+  mutate(timelag = recode(comparison,
+                          "post1_pre" = 3,
+                          "post2_pre" = 5,
+                          "post3_pre" = 11,
+                          "post2_post1" = 2,
+                          "post3_post1" = 8,
+                          "post3_post2" = 6)) %>% 
+  filter(comparison == "post1_pre" |
+           comparison == "post2_post1" |
+           comparison == "post3_post3")
+
+summary(lmer(difference ~ timelag + 
+               (1 | prolificid),
+             data = values_model_time))
+
 ## testing correlation between traits and values ####
 traits_md <- traits %>% 
   group_by(prolificid) %>% 
@@ -251,7 +321,7 @@ traits_md <- traits %>%
             post3_pre = sum(post3_pre, na.rm = T),
             post2_post1 = sum(post2_post1, na.rm = T),
             post3_post1 = sum(post3_post1, na.rm = T),
-            post3_post2 = sum(post3_post1, na.rm = T))
+            post3_post2 = sum(post3_post1, na.rm = T)) 
 
 values_md <- values %>% 
   group_by(prolificid) %>% 
@@ -308,31 +378,63 @@ values_model$comparison <- factor(values_model$comparison,
 values_figure <- values_model %>% 
   group_by(prolificid,comparison,pre_comp,pospectrum) %>% 
   summarize(difference = mean(difference)) %>% 
-  mutate(comparison = recode(comparison,
-                             "post1_pre" = "T1-T0","post2_pre" = "T2-T0",
-                             "post3_pre" = "T3-T0","post2_post1" = "T2-T1",
-                             "post3_post1" = "T3-T1","post3_post2" = "T3-T2"),
+  mutate(comparison.d = recode(comparison,
+                               "post1_pre" = 1,
+                               "post2_pre" = 2,
+                               "post3_pre" = 3,
+                               "post2_post1" = 5,
+                               "post3_post1" = 6,
+                               "post3_post2" = 7),
          pre_comp = factor(pre_comp,levels = c(1,0)))
 
+f2c <- ggplot(values_figure %>% 
+                group_by(prolificid,pre_comp) %>% 
+                summarize(difference = mean(difference,na.rm = T)), 
+              aes(x = pre_comp,y = difference,
+                  color = pre_comp, fill = pre_comp)) +
+  geom_violin(alpha = .3) +
+  stat_summary(fun = mean, fun.min = mean, fun.max = mean, 
+               width = .6, geom = "crossbar") +
+  theme_classic() +
+  labs(y = "Self-View Change\n(Absolute Difference)",
+       title = "Changes in self-views of values", color = "Timepoint\nComparison",
+       fill = "Timepoint\nComparison") +
+  scale_color_manual(values = c("steelblue","olivedrab")) +
+  scale_fill_manual(values = c("steelblue","olivedrab")) +
+  scale_x_discrete(labels = c("Across election","After election")) +
+  geom_segment(x = 1, xend = 2, y = 2.5, yend = 2.5, 
+               size = .75, color = "black",linetype = 'dashed') +
+  annotate("text",label = "*",x = 1.5, y = 2.55, size = 10) +
+  theme(axis.title = element_text(size = 14),
+        axis.title.x = element_blank(),
+        legend.position = "none",
+        axis.text.y = element_text(size = 12),
+        axis.text.x = element_text(size = 14),
+        plot.title = element_text(size = 18, hjust = .5))
 
-ggplot(values_figure, 
-       aes(x = comparison,y = difference,
-           color = as.factor(pre_comp))) +
-  geom_jitter(alpha = .1, size = 2) +
+f2d <- ggplot(values_figure, 
+              aes(x = comparison.d,y = difference, group = comparison,
+                  color = pre_comp, fill = pre_comp)) +
+  geom_violin(alpha = .3) +
   stat_summary(fun = mean, fun.min = mean, fun.max = mean, 
                width = .9, geom = "crossbar") +
   theme_classic() +
-  labs(x = "Comparison Type", y = "Self-View Change\n(Absolute Difference)",
-       title = "Changes in self-views of values",color = "Timepoint\nComparison") +
-  scale_color_manual(values = c("steelblue","olivedrab"),
-                     labels = c("Across election","After election")) +
+  labs(x = "Across election                   After election     ", 
+       y = "Self-View Change\n(Absolute Difference)",
+       title = "Changes in self-views of values", color = "Timepoint\nComparison",
+       fill = "Timepoint\nComparison") +
+  scale_color_manual(values = c("steelblue","olivedrab")) +
+  scale_fill_manual(values = c("steelblue","olivedrab")) +
+  scale_x_continuous(breaks = c(1,2,3,5,6,7),
+                     labels = c("1wk-post–\n2wks-pre","3wks-post–\n2wks-pre",
+                                "9wks-post–\n2wks-pre","3wks-post–\n1wk-post",
+                                "9wks-post–\n1wk-post","9wks-post–\n3wks-post")) +
   theme(axis.title = element_text(size = 14),
-        legend.text = element_text(size = 12),
-        legend.title = element_text(size = 14),
-        axis.title.x = element_blank(),
+        legend.position = "none",
+        axis.text.x = element_text(size = 11,angle = 70, vjust = .5,hjust = .5),
         axis.text = element_text(size = 12),
         plot.title = element_text(size = 18, hjust = .5))
-ggsave("figs/paper/values_q1.jpg", scale = .7)
+
 ##### Q1 - Events ######
 #### Clean/prep #####
 ## personal, valence #####
@@ -734,7 +836,7 @@ summary(lmer(similarity ~ pre_comp +
                (1 + pre_comp | prolificid),
              data = events_sims_model))
 #### figures ######
-ggplot(events_valence_model_abs_fig,
+f2e <- ggplot(events_valence_model_abs_fig,
        aes(x = type, y = valence_change,
            fill = pre_comp, group = pre_comp)) +
   geom_bar(stat = "summary", fun = "mean",
@@ -744,14 +846,17 @@ ggplot(events_valence_model_abs_fig,
   theme_classic() +
   scale_x_discrete(labels = c("Personal events","Political events")) +
   scale_fill_manual(values = c("steelblue","olivedrab"), 
-                    labels = c("Across election","After election")) +
+                    labels = c("Across\nelection","After\nelection")) +
   labs(x = "Event type",y = "Event valence change\n(Absolute difference)",
        title = "Changes in perceived valence\nof specific events",
        fill = "Timepoint\ncomparison") +
   coord_cartesian(ylim = c(0,50)) +
-  geom_segment(x = 1, xend = 2, y = 42, yend = 42, size = .75) +
-  geom_segment(x = .75, xend = 1.25, y = 35, yend = 35, size = .75) +
-  geom_segment(x = 1.75, xend = 2.25, y = 35, yend = 35, size = .75) +
+  geom_segment(x = 1, xend = 2, y = 42, yend = 42, size = .75,
+               linetype = 'dashed') +
+  geom_segment(x = .75, xend = 1.25, y = 35, yend = 35, size = .75,
+               linetype = 'dashed') +
+  geom_segment(x = 1.75, xend = 2.25, y = 35, yend = 35, size = .75,
+               linetype = 'dashed') +
   annotate("text",label = "*",x = 1.5, y = 42.2, size = 10) +
   annotate("text",label = "*",x = 1, y = 35.2, size = 10) +
   annotate("text",label = "*",x = 2, y = 35.2, size = 10) +
@@ -760,9 +865,8 @@ ggplot(events_valence_model_abs_fig,
         legend.title = element_text(size = 14),
         axis.text = element_text(size = 14),
         plot.title = element_text(size = 18, hjust = .5))
-ggsave("figs/paper/event_valence_q1.jpg", scale = .9)
 
-ggplot(events_importance_model_abs_fig,
+f2f <- ggplot(events_importance_model_abs_fig,
        aes(x = type, y = importance_change,
            fill = pre_comp, group = pre_comp)) +
   geom_bar(stat = "summary", fun = "mean",
@@ -772,19 +876,27 @@ ggplot(events_importance_model_abs_fig,
   theme_classic() +
   scale_x_discrete(labels = c("Personal events","Political events")) +
   scale_fill_manual(values = c("steelblue","olivedrab"), 
-                    labels = c("Across election","After election")) +
+                    labels = c("Across\nelection","After\nelection")) +
   labs(x = "Event type",y = "Event importance change\n(Absolute difference)",
        title = "Changes in perceived importance\nof specific events",
        fill = "Timepoint\ncomparison") +
   coord_cartesian(ylim = c(0,7)) +
-  geom_segment(x = 1, xend = 2, y = 2.5, yend = 2.5, size = .75) +
+  geom_segment(x = 1, xend = 2, y = 2.5, yend = 2.5, size = .75,
+               linetype = 'dashed') +
   annotate("text",label = "*",x = 1.5, y = 2.7, size = 10) +
   theme(axis.title = element_text(size = 16),
         legend.text = element_text(size = 12),
         legend.title = element_text(size = 14),
         axis.text = element_text(size = 14),
         plot.title = element_text(size = 18, hjust = .5))
-ggsave("figs/paper/event_importance_q1.jpg", scale = .9)
+##### save Figure 2, for Q1 #######
+
+ggarrange(f2a,f2b,f2c,f2d,f2e,f2f,
+          labels = c("A","B","C","D","E","F"),
+          ncol = 2, nrow = 3,
+          font.label = list(size = 20))
+ggsave("figs/paper/Fig2.jpg", scale = 1.5, width = 7, height = 9)
+
 ##### Q2 - Traits ######
 #### Clean/prep ####
 pre_traits_mem <- post1 %>% 
@@ -869,18 +981,18 @@ summary(lmer(difference ~ pre_comp*pospectrum +
 traits_mem_figure <- traits_mem_model %>% 
   group_by(prolificid,comparison,pre_comp,pospectrum, positive) %>% 
   summarize(difference = mean(difference)) %>% 
-  mutate(pre_comp_fig = if_else(pre_comp == 1,0,1))
+  mutate(pre_comp_fig = if_else(pre_comp == 1,0,1)) %>% 
+  filter(comparison == "pre_mem" | comparison == "post1_mem")
 
-ggplot(traits_mem_figure %>% 
-         filter(comparison == "pre_mem" | 
-                  comparison == "post1_mem"),
-       aes(x = pre_comp_fig, y = difference, color = pre_comp_fig)) +
-  geom_jitter(alpha = .3, width = .2) +
+f3a <- ggplot(traits_mem_figure,
+       aes(x = pre_comp_fig, y = difference,
+           color = pre_comp_fig)) +
+  geom_jitter(alpha = .3, width = .15) +
   geom_smooth(method = "lm", color = "black", linewidth = 1.5) +
   theme_classic() +
   scale_color_gradient(low = "steelblue",high = "olivedrab") +
   scale_x_continuous(breaks = c(0,1),
-                     labels = c("Memory\nfor T0","Memory\nfor T1")) +
+                     labels = c("Across election","After election")) +
   labs(x = "Comparison Type",title = "Self-view memory for traits",
        y = "Self-view memory\n(Absolute Difference)") +
   theme(axis.title = element_text(size = 14),
@@ -889,7 +1001,6 @@ ggplot(traits_mem_figure %>%
         legend.title = element_text(size = 14),
         axis.text = element_text(size = 12),
         plot.title = element_text(size = 16, hjust = .5))
-ggsave("figs/paper/traits_q2.jpg")
 ##### Q2 - Values ######
 #### Clean/prep #####
 pre_values_mem <- post1 %>% 
@@ -967,19 +1078,18 @@ summary(lmer(difference ~ pre_comp*pospectrum +
 values_mem_figure <- values_mem_model %>% 
   group_by(prolificid,comparison,pre_comp,pospectrum) %>% 
   summarize(difference = mean(difference)) %>% 
-  mutate(pre_comp_fig = if_else(pre_comp == 1,0,1))
+  mutate(pre_comp_fig = if_else(pre_comp == 1,0,1)) %>% 
+  filter(comparison == "pre_mem" | 
+           comparison == "post1_mem")
 
-# basic fig with 1 comp
-ggplot(values_mem_figure %>% 
-         filter(comparison == "pre_mem" | 
-                  comparison == "post1_mem"),
+f3b <- ggplot(values_mem_figure,
        aes(x = pre_comp_fig, y = difference, color = pre_comp_fig)) +
-  geom_jitter(alpha = .3, width = .2) +
+  geom_jitter(alpha = .3, width = .15) +
   geom_smooth(method = "lm", color = "black", linewidth = 1.5) +
   theme_classic() +
   scale_color_gradient(low = "steelblue",high = "olivedrab") +
   scale_x_continuous(breaks = c(0,1),
-                     labels = c("Memory\nfor T0","Memory\nfor T1")) +
+                     labels = c("Across election","After election")) +
   labs(x = "Comparison Type",title = "Self-view memory for values",
        y = "Self-view memory\n(Absolute Difference)") +
   annotate("text", label = "*", x = .5,y = 2, size = 10) +
@@ -989,7 +1099,6 @@ ggplot(values_mem_figure %>%
         legend.title = element_text(size = 14),
         axis.text = element_text(size = 12),
         plot.title = element_text(size = 16, hjust = .5))
-ggsave("figs/paper/values_q2.jpg")
 ##### Q2 - Events #####
 #### Clean/prep #####
 ## personal, valence ####
@@ -1353,7 +1462,7 @@ events_valence_model_2_abs_fig <- events_valence_model_2_abs %>%
   mutate(mean_vc = mean(valence_change, na.rm = T),
          sem_vc = sd(valence_change, na.rm = T)/ sqrt(n()))
 
-ggplot(events_valence_model_2_abs_fig,
+f3c <- ggplot(events_valence_model_2_abs_fig,
        aes(x = type, y = valence_change,
            fill = pre_comp, group = pre_comp)) +
   geom_bar(stat = "summary", fun = "mean",
@@ -1363,23 +1472,25 @@ ggplot(events_valence_model_2_abs_fig,
   theme_classic() +
   scale_x_discrete(labels = c("Personal events","Political events")) +
   scale_fill_manual(values = c("steelblue","olivedrab"), 
-                    labels = c("Across election","After election")) +
+                    labels = c("Across\nelection","After\nelection")) +
   labs(x = "Event type",y = "Event importance memory\n(Absolute difference)",
        title = "Memory for perceived valence\nof specific events",
        fill = "Timepoint\ncomparison") +
   coord_cartesian(ylim = c(0,50)) +
-  geom_segment(x = 1, xend = 2, y = 42, yend = 42, size = .75) +
-  geom_segment(x = .75, xend = 1.25, y = 35, yend = 35, size = .75) +
-  geom_segment(x = 1.75, xend = 2.25, y = 35, yend = 35, size = .75) +
+  geom_segment(x = 1, xend = 2, y = 42, yend = 42, size = .75,
+               linetype = 'dashed') +
+  geom_segment(x = .75, xend = 1.25, y = 35, yend = 35, size = .75,
+               linetype = 'dashed') +
+  geom_segment(x = 1.75, xend = 2.25, y = 35, yend = 35, size = .75,
+               linetype = 'dashed') +
   annotate("text",label = "*",x = 1.5, y = 42.2, size = 10) +
   annotate("text",label = "*",x = 1, y = 35.2, size = 10) +
   annotate("text",label = "*",x = 2, y = 35.2, size = 10) +
   theme(axis.title = element_text(size = 16),
         legend.text = element_text(size = 12),
         legend.title = element_text(size = 14),
-        axis.text = element_text(size = 14),
+        axis.text = element_text(size = 13),
         plot.title = element_text(size = 18, hjust = .5))
-ggsave("figs/paper/event_valence_q2.jpg", scale = .9)
 
 events_importance_model_2_abs_fig <- events_importance_model_2_abs %>% 
   mutate(pre_comp = if_else(pre_comp == 0, 1,0),
@@ -1389,7 +1500,7 @@ events_importance_model_2_abs_fig <- events_importance_model_2_abs %>%
   mutate(mean_vc = mean(importance_change, na.rm = T),
          sem_vc = sd(importance_change, na.rm = T)/ sqrt(n()))
 
-ggplot(events_importance_model_2_abs_fig,
+f3d <- ggplot(events_importance_model_2_abs_fig,
        aes(x = type, y = importance_change,
            fill = pre_comp, group = pre_comp)) +
   geom_bar(stat = "summary", fun = "mean",
@@ -1399,17 +1510,24 @@ ggplot(events_importance_model_2_abs_fig,
   theme_classic() +
   scale_x_discrete(labels = c("Personal events","Political events")) +
   scale_fill_manual(values = c("steelblue","olivedrab"), 
-                    labels = c("Across election","After election")) +
+                    labels = c("Across\nelection","After\nelection")) +
   labs(x = "Event type",y = "Event importance memory\n(Absolute difference)",
        title = "Memory for perceived importance\nof specific events",
        fill = "Timepoint\ncomparison") +
   coord_cartesian(ylim = c(0,7)) +
-  geom_segment(x = 1, xend = 2, y = 2.5, yend = 2.5, size = .75) +
+  geom_segment(x = 1, xend = 2, y = 2.5, yend = 2.5, size = .75,
+               linetype = 'dashed') +
   annotate("text",label = "*",x = 1.5, y = 2.7, size = 10) +
   theme(axis.title = element_text(size = 16),
         legend.text = element_text(size = 12),
         legend.title = element_text(size = 14),
-        axis.text = element_text(size = 14),
+        axis.text = element_text(size = 13),
         plot.title = element_text(size = 18, hjust = .5))
-ggsave("figs/paper/event_importance_q2.jpg", scale = .9)
 
+##### save Figure 3, for Q2 #######
+
+ggarrange(f3a,f3b,f3c,f3d,
+          labels = c("A","B","C","D"),
+          ncol = 2, nrow = 2,
+          font.label = list(size = 20))
+ggsave("figs/paper/Fig3.jpg", scale = 1.5, width = 7, height = 7)
